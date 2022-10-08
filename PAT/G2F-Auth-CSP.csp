@@ -1,0 +1,69 @@
+#import "PAT.Lib.ClassLibrary1";   
+#import "PAT.Lib.HashTable"; 
+
+enum{app_id_value,challenge_value,origin_value,channel_id_value,challenge_value_I,challenge_value_2,k_pub_value,k_pri_value,attesttation_cert_value,counter_value};
+
+channel ComUG_U 0;
+channel ComGH_U 0;
+
+var <HashTable> ht_U2F;
+var <HashTable> ht_GWN;
+var <HashTable> ht_HT;
+
+var sig_U2F = [0, 0, 0, 0, 0]; //app_id,challenge,origin,channel_id,counter
+var sig_GWN = [0, 0, 0, 0, 0]; //app_id,challenge,origin,channel_id,counter
+var sig_HT = [0, 0, 0, 0, 0]; //app_id,challenge,origin,channel_id,counter
+
+var handle = [22, 33];//Keys have been added to the handle in the registration phase
+var handle_U2F = [0, 0]; //handle
+var handle_GWN = [0, 0]; //handle
+var handle_HT = [0, 0]; //handle
+
+var app_id=1;
+var challenge=1;
+var origin=1;
+var channel_id=1;
+var attesttation_cert=1;
+var fakekey=8;
+var U2FStore = [0, 0, 0, 0, 0];//app_id,challenge,origin,channel_id,k_pub
+var checkappid = false;
+var k_pub = 0;
+var k_pri = 0;
+var signaturecheck = false;
+var counter = 0;
+var tag = 0;
+
+
+Initial_A() = InitialU2F{ht_U2F.Add(app_id_value,app_id);handle_U2F=handle;challenge=call(RAND,100,0,1);ht_U2F.Add(challenge_value,challenge);} -> 
+            InitialGWN{ht_GWN.Add(app_id_value,app_id);ht_GWN.Add(origin_value,origin);ht_GWN.Add(channel_id_value,channel_id);} ->
+            InitialHT{ht_HT.Add(attesttation_cert_value,attesttation_cert);} -> 
+            Skip;
+            
+HT_A() = ComGH_U?h.app.chal.orig.chan{handle_HT=h;ht_HT.Add(app_id_value,app);ht_HT.Add(challenge_value,chal);ht_HT.Add(origin_value,orig);ht_HT.Add(channel_id_value,chan);} -> IncreaseCounter{counter++;ht_HT.Add(counter_value,counter);} ->
+         CreateSignature{sig_U2F[0]=ht_HT.GetValue(app_id_value);sig_U2F[1]=ht_HT.GetValue(challenge_value);sig_U2F[2]=ht_HT.GetValue(origin_value);sig_U2F[3]=ht_HT.GetValue(channel_id_value);sig_U2F[4]=ht_HT.GetValue(counter_value);var tmp=handle[tag];call(Sign,sig_U2F,tmp);} ->
+         ComGH_U!ht_HT.GetValue(counter_value).sig_U2F -> Skip;      
+         
+HT_A_I() = ComGH_U?h.app.chal.orig.chan{handle_HT=h;ht_HT.Add(app_id_value,app);ht_HT.Add(challenge_value,chal);ht_HT.Add(origin_value,orig);ht_HT.Add(channel_id_value,chan);} -> IncreaseCounter{counter++;ht_HT.Add(counter_value,counter);} ->
+         CreateSignature{sig_U2F[0]=ht_HT.GetValue(app_id_value);sig_U2F[1]=ht_HT.GetValue(challenge_value);sig_U2F[2]=ht_HT.GetValue(origin_value);sig_U2F[3]=ht_HT.GetValue(channel_id_value);sig_U2F[4]=ht_HT.GetValue(counter_value);var tmp=fakekey;call(Sign,sig_U2F,tmp);} ->
+         ComGH_U!ht_HT.GetValue(counter_value).sig_U2F -> Skip;          
+         
+          
+GWN_A() = ComUG_U?h.app.chal{handle_GWN=h;ht_GWN.Add(challenge_value,chal);} -> CheckApp_id{if(ht_GWN.GetValue(app_id_value)==app){checkappid=true;}} -> ComGH_U!handle_GWN.ht_GWN.GetValue(app_id_value).ht_GWN.GetValue(challenge_value).ht_GWN.GetValue(origin_value).ht_GWN.GetValue(channel_id_value) -> 
+          ComGH_U?c.s{ht_GWN.Add(counter_value,counter);sig_GWN=s;} -> ComUG_U!ht_GWN.GetValue(counter_value).ht_GWN.GetValue(challenge_value).ht_GWN.GetValue(origin_value).ht_GWN.GetValue(channel_id_value).sig_GWN -> Skip;
+
+U2F_A() = ComUG_U!handle_U2F.ht_U2F.GetValue(app_id_value).ht_U2F.GetValue(challenge_value) -> ComUG_U?c.chal.orig.chan.s{U2FStore[0]=ht_U2F.GetValue(app_id_value);U2FStore[1]=chal;U2FStore[2]=orig;U2FStore[3]=chan;U2FStore[4]=c;sig_U2F=s;} ->
+          CheckSignature{signaturecheck=call(CheckSigned,sig_U2F,U2FStore,handle_U2F[tag],handle_U2F[tag]);} -> Skip; 
+
+U2F_A_I() = ComUG_U!handle_U2F.ht_U2F.GetValue(app_id_value).ht_U2F.GetValue(challenge_value) -> ComUG_U?c.chal.orig.chan.s{U2FStore[0]=ht_U2F.GetValue(app_id_value);U2FStore[1]=chal;U2FStore[2]=orig;U2FStore[3]=chan;U2FStore[4]=c;sig_U2F=s;} ->
+          CheckSignature{signaturecheck=call(CheckSigned,sig_U2F,U2FStore,handle_U2F[tag],fakekey);} -> Skip;                      
+
+
+G2F_Auth() = Initial_A();(HT_A() || (GWN_A() || U2F_A()));
+G2F_Auth_S() = Initial_A();(HT_A_I() || (GWN_A() || U2F_A_I()));
+
+
+#assert G2F_Auth() deadlockfree;
+#assert G2F_Auth_S() deadlockfree;
+#define SignatureCheck (signaturecheck==true);
+#assert G2F_Auth() |= <> SignatureCheck;
+#assert G2F_Auth_S() |= <> SignatureCheck;
