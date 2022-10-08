@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE nta PUBLIC '-//Uppaal Team//DTD Flat System 1.1//EN' 'http://www.it.uu.se/research/group/darts/uppaal/flat-1_2.dtd'>
+<nta>
+	<declaration>// Place global declarations here.
+broadcast chan  inform;
+clock time, i_time;		// Global time
+bool intruder = false;
+bool user = false;
+</declaration>
+	<template>
+		<name x="5" y="5">User</name>
+		<parameter>int t,int only_pro,int both_pro</parameter>
+		<declaration>
+</declaration>
+		<location id="id0" x="-221" y="-119">
+			<name x="-204" y="-136">Idle</name>
+			<label kind="invariant" x="-246" y="-102">time&lt;=t+1</label>
+		</location>
+		<location id="id1" x="-272" y="-238">
+			<name x="-306" y="-272">BothSend</name>
+		</location>
+		<location id="id2" x="-170" y="-238">
+			<name x="-195" y="-272">UserSend</name>
+		</location>
+		<branchpoint id="id3" x="-221" y="-178">
+		</branchpoint>
+		<init ref="id0"/>
+		<transition>
+			<source ref="id3"/>
+			<target ref="id2"/>
+			<label kind="assignment" x="-195" y="-204">user=true</label>
+			<label kind="probability" x="-187" y="-221">only_pro</label>
+		</transition>
+		<transition>
+			<source ref="id3"/>
+			<target ref="id1"/>
+			<label kind="assignment" x="-323" y="-204">user=true,
+intruder=true</label>
+			<label kind="probability" x="-323" y="-221">both_pro</label>
+		</transition>
+		<transition>
+			<source ref="id0"/>
+			<target ref="id3"/>
+			<label kind="guard" x="-212" y="-170">time&gt;t</label>
+			<label kind="synchronisation" x="-212" y="-153">inform!</label>
+		</transition>
+	</template>
+	<template>
+		<name>Intruder</name>
+		<parameter>int interval, bool m_attack</parameter>
+		<location id="id4" x="-34" y="0">
+			<name x="-76" y="-8">Idle</name>
+			<label kind="invariant" x="-76" y="17">i_time&lt;=interval+1</label>
+		</location>
+		<location id="id5" x="195" y="0">
+			<name x="185" y="-34">End</name>
+		</location>
+		<init ref="id4"/>
+		<transition>
+			<source ref="id4"/>
+			<target ref="id5"/>
+			<label kind="guard" x="0" y="-59">i_time&gt;interval&amp;&amp;!m_attack</label>
+			<label kind="synchronisation" x="0" y="-42">inform!</label>
+			<label kind="assignment" x="0" y="-25">intruder=true</label>
+		</transition>
+		<transition>
+			<source ref="id4"/>
+			<target ref="id4"/>
+			<label kind="guard" x="-59" y="-136">i_time&gt;interval&amp;&amp;m_attack</label>
+			<label kind="synchronisation" x="-59" y="-119">inform!</label>
+			<label kind="assignment" x="-59" y="-102">intruder=true,i_time=0</label>
+			<nail x="-8" y="-76"/>
+			<nail x="-59" y="-76"/>
+		</transition>
+	</template>
+	<template>
+		<name>HT</name>
+		<parameter>int t, bool u_request, int i_pro, int u_pro</parameter>
+		<location id="id6" x="-9" y="-25">
+			<name x="-93" y="-17">PushButton</name>
+			<committed/>
+		</location>
+		<location id="id7" x="110" y="51">
+			<name x="119" y="59">Safe</name>
+		</location>
+		<location id="id8" x="110" y="-93">
+			<name x="85" y="-136">Invaded</name>
+		</location>
+		<location id="id9" x="-161" y="-25">
+			<name x="-152" y="-8">Idle</name>
+			<label kind="invariant" x="-204" y="-59">time&lt;=t+1</label>
+		</location>
+		<branchpoint id="id10" x="110" y="-25">
+		</branchpoint>
+		<init ref="id9"/>
+		<transition>
+			<source ref="id6"/>
+			<target ref="id8"/>
+			<label kind="guard" x="0" y="-119">intruder&amp;&amp;!user</label>
+			<nail x="-8" y="-93"/>
+		</transition>
+		<transition>
+			<source ref="id9"/>
+			<target ref="id7"/>
+			<label kind="guard" x="-51" y="85">time&gt;t</label>
+			<nail x="-161" y="85"/>
+			<nail x="110" y="85"/>
+		</transition>
+		<transition>
+			<source ref="id6"/>
+			<target ref="id7"/>
+			<label kind="guard" x="0" y="25">!intruder&amp;&amp;user</label>
+			<nail x="-8" y="51"/>
+		</transition>
+		<transition>
+			<source ref="id6"/>
+			<target ref="id10"/>
+			<label kind="guard" x="8" y="-51">intruder&amp;&amp;user</label>
+		</transition>
+		<transition>
+			<source ref="id10"/>
+			<target ref="id7"/>
+			<label kind="probability" x="119" y="0">u_pro</label>
+		</transition>
+		<transition>
+			<source ref="id10"/>
+			<target ref="id8"/>
+			<label kind="probability" x="119" y="-68">i_pro</label>
+		</transition>
+		<transition>
+			<source ref="id9"/>
+			<target ref="id6"/>
+			<label kind="guard" x="-136" y="-68">time&gt;t&amp;&amp;u_request</label>
+			<label kind="synchronisation" x="-102" y="-51">inform?</label>
+		</transition>
+	</template>
+	<system>int count_invaded = 0, count_safe= 0;
+// Place template instantiations here.
+User_multiple = User(50,5,1);
+HT_multiple = HT(50,true,1,5);
+Intruder_multiple = Intruder(5,true);
+
+
+Intruder_single = Intruder(5,false);
+HT_single = HT(8,false,100,1);
+// List one or more processes to be composed into a system.
+
+//Persistent Multiple Attacks 
+//system HT_multiple, User_multiple, Intruder_multiple;
+
+//Single Attack 
+system HT_single,Intruder_single; 
+    </system>
+	<queries>
+		<query>
+			<formula>Pr[&lt;=100] (&lt;&gt; HT_multiple.Invaded)
+			</formula>
+			<comment>
+			</comment>
+		</query>
+		<query>
+			<formula>Pr[&lt;=100] (&lt;&gt; HT_multiple.Safe)
+			</formula>
+			<comment>
+			</comment>
+		</query>
+		<query>
+			<formula>Pr[&lt;=100] (&lt;&gt; HT_single.Invaded)
+			</formula>
+			<comment>
+			</comment>
+		</query>
+		<query>
+			<formula>Pr[&lt;=100] (&lt;&gt; HT_single.Safe)
+			</formula>
+			<comment>
+			</comment>
+		</query>
+		<query>
+			<formula>simulate[&lt;=100; 10] { HT_multiple.Safe,HT_multiple.Invaded }
+			</formula>
+			<comment>
+			</comment>
+		</query>
+		<query>
+			<formula>simulate[&lt;=100; 10] { HT_single.Safe,HT_single.Invaded }
+			</formula>
+			<comment>
+			</comment>
+		</query>
+	</queries>
+</nta>
