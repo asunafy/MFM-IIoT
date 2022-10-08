@@ -1,0 +1,79 @@
+role role_HardwareToken(HardwareToken:agent,K:public_key,H:text,Attestation:text,SND,RCV:channel(dy))
+played_by HardwareToken
+def=
+	local
+		State:nat,Origin:text,AppID:text,GWN:agent,Challenge:text,ChanID:text,SSS:text
+	init
+		State := 0
+	transition
+		4. State=0 /\ RCV(GWN'.HardwareToken.AppID'.Challenge'.Origin'.ChanID') =|> State':=1 /\ SSS':=new() /\ witness(HardwareToken,GWN,auth_1,SSS') /\ SND(HardwareToken.GWN'.AppID'.Challenge'.Origin'.ChanID'.H.{SSS'}_inv(K).Attestation)
+end role
+
+role role_GWN(GWN:agent,Request:text,H:text,AppID:text,Challenge:text,Origin:text,ChanID:text,SND,RCV:channel(dy))
+played_by GWN
+def=
+	local
+		State:nat,Inform:text,IoTServer:agent,Attestation:text,HardwareToken:agent,K:public_key,SSS:text,U2FServer:agent
+	init
+		State := 0
+	transition
+		1. State=0 /\ RCV(IoTServer'.GWN.Inform') =|> State':=1 /\ U2FServer':=new() /\ SND(GWN.U2FServer'.Request)
+		3. State=1 /\ RCV(U2FServer.GWN.AppID.Challenge) =|> State':=2 /\ HardwareToken':=new() /\ SND(GWN.HardwareToken'.AppID.Challenge.Origin.ChanID)
+		5. State=2 /\ RCV(HardwareToken.GWN.AppID.Challenge.Origin.ChanID.H.{SSS'}_inv(K').Attestation') =|> State':=3 /\ request(GWN,HardwareToken,auth_1,SSS') /\ SND(GWN.U2FServer.Challenge.Origin.ChanID.{SSS'}_inv(K'))
+end role
+
+role role_U2FServer(U2FServer:agent,AppID:text,Challenge:text,Finish:text,K:public_key,SND,RCV:channel(dy))
+played_by U2FServer
+def=
+	local
+		State:nat,Request:text,SSS:text,Origin:text,GWN:agent,ChanID:text,IoTServer:agent
+	init
+		State := 0
+	transition
+		2. State=0 /\ RCV(GWN'.U2FServer.Request') =|> State':=1 /\ SND(U2FServer.GWN'.AppID.Challenge)
+		6. State=1 /\ RCV(GWN.U2FServer.Challenge.Origin'.ChanID'.{SSS'}_inv(K)) =|> State':=2 /\ IoTServer':=new() /\ SND(U2FServer.IoTServer'.Finish)
+end role
+
+role role_IoTServer(IoTServer:agent,Inform:text,SND,RCV:channel(dy))
+played_by IoTServer
+def=
+	local
+		State:nat,GWN:agent,Finish:text,U2FServer:agent
+	init
+		State := 0
+	transition
+		1. State=0 /\ RCV(start) =|> State':=1 /\ GWN':=new() /\ SND(IoTServer.GWN'.Inform)
+		7. State=1 /\ RCV(U2FServer'.IoTServer.Finish') =|> State':=2
+end role
+
+role session1(K:public_key,Finish:text,Challenge:text,AppID:text,U2FServer:agent,Attestation:text,HardwareToken:agent,GWN:agent,Request:text,H:text,Origin:text,ChanID:text,IoTServer:agent,Inform:text)
+def=
+	local
+		SND4,RCV4,SND3,RCV3,SND2,RCV2,SND1,RCV1:channel(dy)
+	composition
+		role_IoTServer(IoTServer,Inform,SND4,RCV4) /\ role_U2FServer(U2FServer,AppID,Challenge,Finish,K,SND3,RCV3) /\ role_GWN(GWN,Request,H,AppID,Challenge,Origin,ChanID,SND2,RCV2) /\ role_HardwareToken(HardwareToken,K,H,Attestation,SND1,RCV1)
+end role
+
+role session2(K:public_key,Finish:text,Challenge:text,AppID:text,U2FServer:agent,Attestation:text,HardwareToken:agent,GWN:agent,Request:text,H:text,Origin:text,ChanID:text,IoTServer:agent,Inform:text)
+def=
+	local
+		SND4,RCV4,SND3,RCV3,SND2,RCV2,SND1,RCV1:channel(dy)
+	composition
+		role_IoTServer(IoTServer,Inform,SND4,RCV4) /\ role_U2FServer(U2FServer,AppID,Challenge,Finish,K,SND3,RCV3) /\ role_GWN(GWN,Request,H,AppID,Challenge,Origin,ChanID,SND2,RCV2) /\ role_HardwareToken(HardwareToken,K,H,Attestation,SND1,RCV1)
+end role
+
+role environment()
+def=
+	const
+		iotserver:agent,origin:text,request:text,hardwaretoken:agent,appid:text,finish:text,const_1:text,k:public_key,hash_0:hash_func,ki:public_key,challenge:text,u2fserver:agent,gwn:agent,h:text,chanid:text,inform:text,auth_1:protocol_id,auth_2:protocol_id
+	intruder_knowledge = {gwn,u2fserver,iotserver,inform,request,h,appid,challenge,origin,chanid,finish,k,ki}
+	composition
+		session2(ki,finish,challenge,appid,u2fserver,const_1,hardwaretoken,gwn,request,h,origin,chanid,iotserver,inform) /\ session1(k,finish,challenge,appid,u2fserver,const_1,hardwaretoken,gwn,request,h,origin,chanid,iotserver,inform)
+end role
+
+goal
+	authentication_on auth_1
+	authentication_on auth_2
+end goal
+
+environment()
