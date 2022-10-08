@@ -21,5 +21,4 @@ int RANDOM_API RAND(int max, int min, int n);
 #endif // __cplusplus
 
 #endif
-Footer
-© 2022 GitHub, Inc.
+
